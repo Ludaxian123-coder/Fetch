@@ -1,0 +1,62 @@
+#What are the top 5 brands by receipts scanned for most recent month?
+select brand.id, brand.name
+from  receipts join item on receipts._id=item.receipts_id and receipts.barcode=item.barcode
+ join brand on item.barcode=brand.barcode and brand.id=item.brand_id
+where receipts.dateScanned >= dateadd(month,-1,getdate())
+group by brand.id,brand.name
+order by  count(receipts.barcode) desc
+limit 5;
+
+#How does the ranking of the top 5 brands by receipts scanned for the recent month compare to the ranking for the previous month?
+select c.id,c.name,d.id,d.name from 
+(
+select *,row_number()over(order by count(receipts.barcode) desc )as drank  from 
+(select brand.id,brand.name 
+from  receipts join item on receipts._id=item.receipts_id and receipts.barcode=item.barcode
+ join brand on item.barcode=brand.barcode and brand.id=item.brand_id
+where receipts.dateScanned > DATEADD(month, -2, GETDATE()) and receipts.dateScanned<=dateadd(month,-1,getdate())
+group by brand.name,brand.id 
+order by count(receipts.barcode) desc
+limit 5 )as a) as c  
+join 
+(select *,row_number()over(order by count(receipts.barcode) desc )as drank  from 
+(select brand.id,brand.name 
+from  receipts join item on receipts._id=item.receipts_id and receipts.barcode=item.barcode
+ join brand on item.barcode=brand.barcode and brand.id=item.brand_id
+where receipts.dateScanned >= DATEADD(month, -1, GETDATE()) 
+group by brand.name,brand.id 
+order by count(receipts.barcode) desc
+limit 5 )as b) as d 
+on c.drank=d.drank 
+;
+
+
+
+
+
+
+
+#When considering average spend from receipts with 'rewardsReceiptStatus’ of ‘Accepted’ or ‘Rejected’, which is greater?
+select (sum(finalprice*quantityPurchased)+sum(userFlaggedPrice*userFlaggedQuantity))/count(receipts.barcode) as avg_spend,rewardsreceiptstatus 
+from  receipts join item on receipts._id=item.receipts_id and receipts.barcode=item.barcode
+ join brand on item.barcode=brand.barcode and brand.id=item.brand_id
+where rewardsreceiptstatus in (‘Accepted’ , ‘Rejected’)
+group by rewardsreceiptstatus;
+
+#When considering total number of items purchased from receipts with 'rewardsReceiptStatus’ of ‘Accepted’ or ‘Rejected’, which is greater?
+select count(barcode) as item_number,rewardsreceiptstatus 
+from receipts
+where rewardsreceiptstatus in (‘Accepted’ , ‘Rejected’)
+group by  rewardsreceiptstatus;
+
+#Which brand has the most spend among users who were created within the past 6 months?
+select brand.name from 
+receipts join users on receipts.userid=users.id 
+join item on receipts.barcode=item.barcode and receipts._id=item.receipts_id 
+join brand on brand.barcode=receipts.barcode  and brand.id=item.brand_id
+where users.createdate>= DATEADD(month, -6, GETDATE()) 
+group by brand.id 
+order by sum(finalPrice*quantityPurchased+userFlaggedPrice*userFlaggedQuantity) desc 
+limit 1 ;
+
+
